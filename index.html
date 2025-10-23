@@ -65,6 +65,21 @@
         font-size: 1rem;
         line-height: 1.2;
       }
+      .bingo-cell.shake {
+        animation: shake 0.3s;
+      }
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-5px);
+        }
+        75% {
+          transform: translateX(5px);
+        }
+      }
       /* Estilo llamativo para cabecera BINGO */
       .bingo-header-cell {
         display: flex;
@@ -94,6 +109,9 @@
         transform: scale(1.1);
       }
       #win-message {
+        transition: all 0.3s ease;
+      }
+      #win-message.bingo-win {
         animation: pulse-win 1s infinite;
       }
       @keyframes pulse-win {
@@ -141,33 +159,66 @@
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       }
       /* Botones con nueva paleta */
+      .btn {
+        font-weight: bold;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
       .btn-primary {
         background-color: var(--color-primary);
         color: white;
       }
-      .btn-primary:hover {
+      .btn-primary:hover:not(:disabled) {
         background-color: var(--color-primary-dark);
       }
       .btn-secondary {
         background-color: var(--color-secondary);
         color: white;
       }
-      .btn-secondary:hover {
+      .btn-secondary:hover:not(:disabled) {
         background-color: #be123c; /* pink-700 */
       }
       .btn-accent {
         background-color: var(--color-accent);
         color: white;
       }
-      .btn-accent:hover {
+      .btn-accent:hover:not(:disabled) {
         background-color: #d97706; /* amber-600 */
+      }
+      .btn-green {
+        background-color: #16a34a; /* green-600 */
+        color: white;
+      }
+      .btn-green:hover:not(:disabled) {
+        background-color: #15803d; /* green-700 */
       }
       .btn-gray {
         background-color: #9ca3af; /* bg-gray-400 */
         color: #1f2937; /* text-gray-800 */
       }
-      .btn-gray:hover {
+      .btn-gray:hover:not(:disabled) {
         background-color: #6b7280; /* bg-gray-500 */
+      }
+      .btn-outline {
+        background-color: transparent;
+        color: var(--color-primary);
+        border: 2px solid var(--color-primary);
+      }
+      .btn-outline:hover:not(:disabled) {
+        background-color: var(--color-primary);
+        color: white;
       }
     </style>
   </head>
@@ -194,16 +245,10 @@
         />
         <div id="modal-error" class="text-red-500 text-sm mt-2 h-4"></div>
         <div class="flex gap-4 mt-4">
-          <button
-            id="modal-cancel-button"
-            class="flex-1 btn-gray font-bold py-3 px-6 rounded-lg transition-all duration-200"
-          >
+          <button id="modal-cancel-button" class="flex-1 btn btn-gray">
             Cancelar
           </button>
-          <button
-            id="modal-submit-button"
-            class="flex-1 btn-primary font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200"
-          >
+          <button id="modal-submit-button" class="flex-1 btn btn-primary">
             Buscar
           </button>
         </div>
@@ -218,7 +263,7 @@
         BINGO PLUS
       </h1>
 
-      <!-- Info del Juego (ID y Premio) -->
+      <!-- Info del Juego (ID, Premio, Modalidad) -->
       <div
         class="text-center mb-4 p-4 bg-white rounded-xl shadow-md max-w-lg mx-auto space-y-2"
       >
@@ -240,23 +285,29 @@
             >¡Mucha Suerte!</span
           >
         </div>
+        <!-- NUEVO: Modalidad de Juego para el Jugador -->
+        <div class="flex justify-between items-center">
+          <span class="text-lg font-semibold text-gray-700">Modalidad:</span>
+          <span
+            id="game-mode-display"
+            class="text-lg font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full"
+            >---</span
+          >
+        </div>
       </div>
 
       <!-- Botón para forzar modo Admin -->
       <div id="admin-toggle-button-wrapper" class="text-center mb-4">
-        <button
-          id="admin-toggle-button"
-          class="btn-gray font-bold py-2 px-4 rounded-lg text-xs"
-        >
+        <button id="admin-toggle-button" class="btn btn-gray text-xs py-2 px-4">
           Activar Modo Admin
         </button>
       </div>
 
       <!-- Mensaje de BINGO (oculto por defecto) -->
-      <div id="win-message" class="hidden text-center mb-6">
+      <div id="win-message" class="hidden text-center mb-6 p-4 rounded-lg">
         <span
           id="win-message-text"
-          class="text-6xl md:text-7xl font-extrabold text-amber-500"
+          class="text-4xl md:text-5xl font-extrabold text-amber-500"
           >¡B I N G O!</span
         >
       </div>
@@ -276,20 +327,58 @@
 
           <!-- Panel de Administrador (oculto por defecto) -->
           <div id="admin-panel" class="hidden w-full space-y-4">
-            <div class="flex flex-col sm:flex-row gap-4 w-full">
+            <!-- NUEVO: Área de Notificación de Admin -->
+            <div
+              id="admin-notification-area"
+              class="hidden p-3 rounded-lg text-center font-semibold"
+            ></div>
+
+            <!-- NUEVO: Botones de Confirmación de Bingo (ocultos) -->
+            <div
+              id="admin-confirm-buttons"
+              class="hidden flex flex-col sm:flex-row gap-4 w-full"
+            >
               <button
-                id="draw-button"
-                class="flex-1 btn-secondary font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
+                id="reject-win-button"
+                class="flex-1 btn btn-secondary text-lg"
               >
-                Sortear
+                Rechazar Bingo
               </button>
               <button
-                id="reset-button"
-                class="flex-1 btn-accent text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
+                id="confirm-win-button"
+                class="flex-1 btn btn-green text-lg"
               >
-                Nuevo Juego
+                Confirmar Ganador
               </button>
             </div>
+
+            <!-- Sorteo Manual -->
+            <button id="draw-button" class="w-full btn btn-primary text-lg">
+              Sortear (Manual)
+            </button>
+            <!-- Sorteo Automático -->
+            <div class="p-4 bg-white rounded-lg shadow-sm">
+              <label
+                for="auto-draw-seconds"
+                class="block text-sm font-medium text-gray-700 mb-1"
+                >Sorteo Automático (segundos):</label
+              >
+              <div class="flex gap-2">
+                <input
+                  id="auto-draw-seconds"
+                  type="number"
+                  value="5"
+                  class="w-1/3 border-2 border-gray-300 rounded-lg p-2 focus:border-purple-500 focus:ring-0"
+                  placeholder="Ej: 5"
+                />
+                <button id="auto-draw-button" class="flex-1 btn btn-outline">
+                  Iniciar Auto
+                </button>
+              </div>
+            </div>
+            <button id="reset-button" class="w-full btn btn-accent text-lg">
+              Nuevo Juego
+            </button>
 
             <!-- Configuración de Juego (Premio y Modalidad) -->
             <div class="space-y-4 p-4 bg-white rounded-lg shadow-sm">
@@ -326,7 +415,7 @@
                   />
                   <button
                     id="save-prize-button"
-                    class="btn-primary font-semibold px-4 rounded-lg"
+                    class="btn btn-primary font-semibold px-4 rounded-lg"
                   >
                     Guardar
                   </button>
@@ -375,23 +464,23 @@
               <!-- Contenedores de Números -->
               <div
                 id="called-B"
-                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
+                class="flex flex-col-reverse space-y-1 space-y-reverse h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
               ></div>
               <div
                 id="called-I"
-                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
+                class="flex flex-col-reverse space-y-1 space-y-reverse h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
               ></div>
               <div
                 id="called-N"
-                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
+                class="flex flex-col-reverse space-y-1 space-y-reverse h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
               ></div>
               <div
                 id="called-G"
-                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
+                class="flex flex-col-reverse space-y-1 space-y-reverse h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
               ></div>
               <div
                 id="called-O"
-                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
+                class="flex flex-col-reverse space-y-1 space-y-reverse h-40 overflow-y-auto p-1 border border-gray-200 rounded-md"
               ></div>
             </div>
           </div>
@@ -404,15 +493,24 @@
           <div class="max-w-md mx-auto">
             <!-- Panel de Jugador -->
             <div id="player-panel" class="mb-4 space-y-4 text-center">
-              <button
-                id="load-card-button"
-                class="w-full btn-primary font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
-              >
-                Buscar mi Cartón
-              </button>
+              <div class="flex gap-4">
+                <button
+                  id="load-card-button"
+                  class="flex-1 btn btn-primary text-lg"
+                >
+                  Buscar mi Cartón
+                </button>
+                <!-- NUEVO: Botón de Sincronización -->
+                <button
+                  id="sync-cards-button"
+                  class="flex-1 btn btn-outline text-lg"
+                >
+                  Sincronizar
+                </button>
+              </div>
               <button
                 id="bingo-button"
-                class="w-full btn-secondary font-bold py-4 px-6 rounded-lg shadow-lg transition-all duration-200 text-2xl animate-pulse"
+                class="w-full btn btn-secondary text-2xl py-4 animate-pulse"
               >
                 ¡BINGO!
               </button>
@@ -463,7 +561,7 @@
 
       // --- CONTRASEÑA DE ADMIN ---
       // ¡Cámbiala aquí si lo deseas!
-      const ADMIN_PASSWORD = "Clara2025";
+      const ADMIN_PASSWORD = "1234";
 
       // Pega aquí la configuración de TU proyecto de Firebase
       // O usa la variable __firebase_config para probar en el 'Preview'
@@ -486,23 +584,31 @@
 
       // Estado del juego
       let currentGameId = null;
-      let currentGameMode = "full_card"; // Valor por defecto
+      let currentGameMode = "full_card";
       let localLoadedCards = new Map();
       let calledNumbers = new Set();
-      let isGameWon = false;
+      let isGameWon = false; // Se vuelve 'true' solo cuando el admin confirma
+      let autoDrawInterval = null;
+      let pendingBingoCheck = null; // Almacena el ID del cartón que está siendo verificado
+
       let unsubscribeGame = null;
-      let unsubscribeCards = null;
+      let unsubscribeActiveCards = null;
+      let unsubscribeBingoChecks = null;
 
       // Elementos del DOM
       const adminPanel = document.getElementById("admin-panel");
       const playerPanel = document.getElementById("player-panel");
       const drawButton = document.getElementById("draw-button");
+      const autoDrawButton = document.getElementById("auto-draw-button");
+      const autoDrawSecondsInput = document.getElementById("auto-draw-seconds");
       const resetButton = document.getElementById("reset-button");
       const loadCardButton = document.getElementById("load-card-button");
       const bingoButton = document.getElementById("bingo-button");
+      const syncCardsButton = document.getElementById("sync-cards-button"); // NUEVO
 
       const gameIdDisplay = document.getElementById("game-id-display");
       const prizeDisplay = document.getElementById("prize-display");
+      const gameModeDisplay = document.getElementById("game-mode-display"); // NUEVO
       const currentNumberDisplay = document.getElementById(
         "current-number-display"
       );
@@ -528,6 +634,15 @@
       const activeCardsListEl = document.getElementById("active-cards-list");
       const activeCardsCountEl = document.getElementById("active-cards-count");
       const adminToggleButton = document.getElementById("admin-toggle-button");
+      // NUEVOS elementos de Admin
+      const adminNotificationArea = document.getElementById(
+        "admin-notification-area"
+      );
+      const adminConfirmButtons = document.getElementById(
+        "admin-confirm-buttons"
+      );
+      const confirmWinButton = document.getElementById("confirm-win-button");
+      const rejectWinButton = document.getElementById("reject-win-button");
 
       // Elementos del Tablero
       const calledB_El = document.getElementById("called-B");
@@ -543,6 +658,12 @@
         2: { min: 31, max: 45 }, // N
         3: { min: 46, max: 60 }, // G
         4: { min: 61, max: 75 }, // O
+      };
+      const GAME_MODE_NAMES = {
+        full_card: "Cartón Lleno",
+        h_line: "Línea Horizontal",
+        v_line: "Línea Vertical",
+        corners: "Cuatro Esquinas",
       };
 
       // --- 1. Inicialización y Autenticación ---
@@ -560,10 +681,13 @@
 
         // Listeners de botones
         resetButton.addEventListener("click", handleNewGame);
-        drawButton.addEventListener("click", handleDrawNumber);
+        drawButton.addEventListener("click", () => handleDrawNumber(false)); // false = no es auto
+        autoDrawButton.addEventListener("click", toggleAutoDraw);
         savePrizeButton.addEventListener("click", handleSavePrize);
+
         loadCardButton.addEventListener("click", promptLoadCard);
-        bingoButton.addEventListener("click", handleBingoButton);
+        syncCardsButton.addEventListener("click", syncAllCards); // NUEVO
+        bingoButton.addEventListener("click", handleBingoButton); // MODIFICADO
 
         modalCancelButton.addEventListener("click", () =>
           modal.classList.add("hidden")
@@ -571,6 +695,10 @@
         modalSubmitButton.addEventListener("click", handleSubmitModal);
 
         adminToggleButton.addEventListener("click", promptAdminPassword);
+
+        // NUEVOS Listeners de Admin
+        confirmWinButton.addEventListener("click", handleConfirmWin);
+        rejectWinButton.addEventListener("click", handleRejectWin);
       });
 
       async function checkAuth() {
@@ -591,8 +719,8 @@
         onAuthStateChanged(auth, (user) => {
           if (user) {
             userId = user.uid;
-            setupAppMode(); // Configura el modo (admin/player)
-            listenToCurrentGame(); // Empieza a escuchar el juego activo
+            setupAppMode();
+            listenToCurrentGame();
           } else {
             console.log("Usuario no autenticado.");
           }
@@ -600,12 +728,11 @@
       }
 
       function setupAppMode() {
-        // El modo Admin ahora se activa con contraseña
         adminPanel.classList.add("hidden");
         playerPanel.classList.remove("hidden");
       }
 
-      // --- Lógica del Modal (ahora multi-propósito) ---
+      // --- Lógica del Modal ---
       function handleSubmitModal() {
         if (modalMode === "loadCard") {
           handleLoadCard();
@@ -635,7 +762,6 @@
           showAdminPanel();
           adminToggleButton.classList.add("hidden");
           modal.classList.add("hidden");
-          // Si el listener del juego ya se ejecutó, iniciar listener de cartones
           if (currentGameId) {
             listenToActiveCards();
           }
@@ -651,6 +777,8 @@
 
       async function handleNewGame() {
         console.log("Iniciando nuevo juego...");
+
+        if (autoDrawInterval) stopAutoDraw();
 
         const newGameId = `SORTEO-${
           new Date().toISOString().split("T")[0]
@@ -677,10 +805,10 @@
             cardData: cardDataJSON,
             cardId: i.toString(),
             status: "inactive",
+            bingoCheck: null, // Resetear estado de check
           });
         }
 
-        // Guardar modalidad y premio inicial
         const selectedMode = gameModeSelect.value;
         const prize = prizeInput.value || "¡Mucha Suerte!";
 
@@ -698,6 +826,8 @@
           allNumbers: Array.from({ length: 75 }, (_, i) => i + 1),
           gameMode: selectedMode,
           prize: prize,
+          gameStatus: "playing", // NUEVO: Estado del juego
+          winnerCardId: null,
         });
 
         const configDocRef = doc(
@@ -714,7 +844,8 @@
         try {
           await batch.commit();
           console.log("¡Nuevo juego creado exitosamente!");
-          prizeDisplay.textContent = prize; // Actualizar UI local del admin
+          prizeDisplay.textContent = prize;
+          gameModeDisplay.textContent = GAME_MODE_NAMES[selectedMode];
         } catch (e) {
           console.error("Error al crear nuevo juego:", e);
         }
@@ -723,10 +854,7 @@
       async function handleSavePrize() {
         if (!currentGameId || !isAdmin) return;
         const prize = prizeInput.value;
-        if (prize.trim() === "") {
-          alert("Por favor, introduce un premio válido.");
-          return;
-        }
+        if (prize.trim() === "") return;
 
         const gameDocRef = doc(
           db,
@@ -745,10 +873,46 @@
         }
       }
 
-      async function handleDrawNumber() {
-        if (!currentGameId || isGameWon) return;
+      function toggleAutoDraw() {
+        if (autoDrawInterval) {
+          stopAutoDraw();
+        } else {
+          startAutoDraw();
+        }
+      }
 
+      function startAutoDraw() {
         drawButton.disabled = true;
+        autoDrawButton.textContent = "Detener Auto";
+        autoDrawButton.classList.remove("btn-outline");
+        autoDrawButton.classList.add("btn-secondary");
+
+        handleDrawNumber(true); // Saca el primer número inmediatamente
+
+        const seconds = parseInt(autoDrawSecondsInput.value, 10) || 5;
+        autoDrawInterval = setInterval(
+          () => handleDrawNumber(true),
+          seconds * 1000
+        );
+      }
+
+      function stopAutoDraw() {
+        clearInterval(autoDrawInterval);
+        autoDrawInterval = null;
+        if (!isGameWon && !pendingBingoCheck) {
+          // Solo reactivar si no hay un ganador o check pendiente
+          drawButton.disabled = false;
+        }
+        autoDrawButton.textContent = "Iniciar Auto";
+        autoDrawButton.classList.remove("btn-secondary");
+        autoDrawButton.classList.add("btn-outline");
+      }
+
+      async function handleDrawNumber(isAuto = false) {
+        if (!currentGameId || isGameWon || pendingBingoCheck) return;
+
+        if (!isAuto) drawButton.disabled = true;
+
         const gameDocRef = doc(
           db,
           "artifacts",
@@ -763,7 +927,7 @@
           const gameDoc = await getDoc(gameDocRef);
           if (!gameDoc.exists()) {
             console.error("El documento del juego no existe.");
-            drawButton.disabled = false;
+            if (!isAuto) drawButton.disabled = false;
             return;
           }
 
@@ -774,6 +938,7 @@
 
           if (availableNumbers.length === 0) {
             console.log("No hay más números para sortear.");
+            if (autoDrawInterval) stopAutoDraw();
             return;
           }
 
@@ -783,12 +948,14 @@
           const newDrawnNumbers = [...drawnNumbers, newNumber];
           await updateDoc(gameDocRef, { drawnNumbers: newDrawnNumbers });
 
-          setTimeout(() => {
-            if (!isGameWon) drawButton.disabled = false;
-          }, 500);
+          if (!isAuto) {
+            setTimeout(() => {
+              if (!isGameWon && !pendingBingoCheck) drawButton.disabled = false;
+            }, 500);
+          }
         } catch (e) {
           console.error("Error al sortear número:", e);
-          drawButton.disabled = false;
+          if (!isAuto) drawButton.disabled = false;
         }
       }
 
@@ -841,7 +1008,9 @@
             localLoadedCards.set(cardId, { data: cardData, index: cardIndex });
             renderCard(cardData, cardIndex, cardId);
 
-            // Reportar cartón como activo
+            // Sincronizar el cartón recién cargado
+            syncSingleCard(cardId);
+
             try {
               await updateDoc(cardDocRef, {
                 status: "active",
@@ -865,29 +1034,78 @@
         }
       }
 
-      function handleBingoButton() {
-        if (isGameWon) return; // Alguien ya ganó
-
-        let playerHasWon = false;
-        let winningCardId = null;
-
-        // Revisar todos los cartones cargados por este jugador
+      // NUEVO: Sincroniza todos los cartones cargados por el jugador
+      function syncAllCards() {
         localLoadedCards.forEach((card, cardId) => {
-          if (checkWin(card.index, cardId)) {
-            playerHasWon = true;
-            winningCardId = cardId;
+          syncSingleCard(cardId);
+        });
+      }
+
+      // NUEVO: Sincroniza un cartón específico
+      function syncSingleCard(cardId) {
+        const card = localLoadedCards.get(cardId);
+        if (!card) return;
+
+        const cardContainer = document.getElementById(`card-${card.index}`);
+        if (!cardContainer) return;
+
+        cardContainer.querySelectorAll(".bingo-cell").forEach((cell) => {
+          const number = cell.dataset.number;
+          if (number === "GRATIS") {
+            cell.classList.add("marked");
+            return;
+          }
+
+          if (calledNumbers.has(parseInt(number, 10))) {
+            cell.classList.add("marked");
           }
         });
+      }
 
-        if (playerHasWon) {
-          triggerWin(winningCardId);
+      // MODIFICADO: El jugador solo solicita la verificación
+      async function handleBingoButton() {
+        if (isGameWon || localLoadedCards.size === 0) return;
+
+        // El jugador solo puede pedir un check por cartón
+        bingoButton.disabled = true;
+        winMessageText.textContent = "Verificando tu BINGO con el admin...";
+        winMessage.classList.add("hidden"); // Ocultar mensaje anterior
+        winMessage.classList.remove("bg-red-200", "text-red-800", "bingo-win");
+        winMessage.classList.add("bg-yellow-100", "text-yellow-700");
+        winMessage.classList.remove("hidden");
+
+        // Por simplicidad, solo chequeamos el primer cartón cargado.
+        // Una app más compleja permitiría elegir cuál cartón cantar.
+        const firstCardId = localLoadedCards.keys().next().value;
+
+        if (firstCardId) {
+          await requestBingoCheck(firstCardId);
         } else {
-          // Opcional: Mostrar un mensaje de "Aún no ganas"
-          winMessageText.textContent = "¡Aún no!";
-          winMessage.classList.remove("hidden");
-          setTimeout(() => {
-            if (!isGameWon) winMessage.classList.add("hidden");
-          }, 2000);
+          bingoButton.disabled = false;
+          winMessage.classList.add("hidden");
+        }
+      }
+
+      // NUEVO: El jugador escribe en la BD que quiere un check
+      async function requestBingoCheck(cardId) {
+        const cardDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards",
+          cardId
+        );
+        try {
+          // Notifica al admin
+          await updateDoc(cardDocRef, { bingoCheck: "pending" });
+        } catch (e) {
+          console.error("Error al solicitar check de BINGO:", e);
+          bingoButton.disabled = false; // Permitir reintentar si falla
+          winMessage.classList.add("hidden");
         }
       }
 
@@ -916,11 +1134,13 @@
                 gameIdDisplay.textContent = currentGameId;
 
                 if (unsubscribeGame) unsubscribeGame();
-                if (unsubscribeCards) unsubscribeCards();
+                if (unsubscribeActiveCards) unsubscribeActiveCards();
+                if (unsubscribeBingoChecks) unsubscribeBingoChecks();
 
                 resetLocalGame();
 
                 listenToGameData();
+                listenForBingoChecks(); // NUEVO: Todos escuchan
                 if (isAdmin) {
                   listenToActiveCards();
                 }
@@ -953,27 +1173,63 @@
           gameDocRef,
           (doc) => {
             if (doc.exists()) {
-              const { drawnNumbers, gameMode, prize } = doc.data();
+              const {
+                drawnNumbers,
+                gameMode,
+                prize,
+                gameStatus,
+                winnerCardId,
+              } = doc.data();
 
-              // Sincronizar números
               calledNumbers = new Set(drawnNumbers);
               updateCalledNumbersUI(drawnNumbers);
 
-              // Sincronizar modalidad
               currentGameMode = gameMode || "full_card";
+              gameModeDisplay.textContent = GAME_MODE_NAMES[currentGameMode];
               if (isAdmin) {
                 gameModeSelect.value = currentGameMode;
               }
 
-              // Sincronizar premio
               const displayPrize = prize || "¡Mucha Suerte!";
               prizeDisplay.textContent = displayPrize;
               if (isAdmin) {
                 prizeInput.value = prize;
               }
 
-              if (drawnNumbers.length === 75) {
+              // Lógica de juego terminado (confirmado por admin)
+              if (gameStatus === "finished") {
                 isGameWon = true;
+                if (autoDrawInterval) stopAutoDraw();
+                if (isAdmin) {
+                  drawButton.disabled = true;
+                  autoDrawButton.disabled = true;
+                  adminNotificationArea.classList.add("hidden");
+                  adminConfirmButtons.classList.add("hidden");
+                }
+                // Desactivar botones de jugador
+                bingoButton.disabled = true;
+                loadCardButton.disabled = true;
+                syncCardsButton.disabled = true;
+
+                winMessageText.textContent = `¡BINGO! (Cartón #${
+                  winnerCardId || "Ganador"
+                })`;
+                winMessage.classList.add("bingo-win", "bg-transparent");
+                winMessage.classList.remove("bg-yellow-100", "text-yellow-700");
+                winMessage.classList.remove("hidden");
+              } else {
+                // Si el juego está activo, asegurarse de que los botones estén habilitados
+                // (a menos que haya un check pendiente)
+                if (!pendingBingoCheck && !isGameWon) {
+                  if (isAdmin) drawButton.disabled = false;
+                  bingoButton.disabled = false;
+                  loadCardButton.disabled = false;
+                  syncCardsButton.disabled = false;
+                }
+              }
+
+              if (drawnNumbers.length === 75 && gameStatus !== "finished") {
+                if (autoDrawInterval) stopAutoDraw();
                 if (isAdmin) drawButton.disabled = true;
               }
             }
@@ -986,6 +1242,7 @@
 
       function listenToActiveCards() {
         if (!currentGameId || !isAdmin) return;
+        if (unsubscribeActiveCards) unsubscribeActiveCards();
 
         const cardsCollectionRef = collection(
           db,
@@ -998,7 +1255,7 @@
           "cards"
         );
 
-        unsubscribeCards = onSnapshot(
+        unsubscribeActiveCards = onSnapshot(
           cardsCollectionRef,
           (querySnapshot) => {
             activeCardsListEl.innerHTML = "";
@@ -1008,7 +1265,7 @@
                 cardIds.push(doc.data().cardId);
               }
             });
-            cardIds.sort((a, b) => parseInt(a) - parseInt(b));
+            cardIds.sort((a, b) => parseInt(a) - b);
             cardIds.forEach((cardId) => {
               const cardTag = document.createElement("span");
               cardTag.className = "active-card-tag";
@@ -1023,37 +1280,121 @@
         );
       }
 
+      // NUEVO: Listener para solicitudes de BINGO (lo corren todos)
+      function listenForBingoChecks() {
+        if (!currentGameId) return;
+        if (unsubscribeBingoChecks) unsubscribeBingoChecks();
+
+        const cardsCollectionRef = collection(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards"
+        );
+
+        unsubscribeBingoChecks = onSnapshot(
+          cardsCollectionRef,
+          (querySnapshot) => {
+            querySnapshot.docChanges().forEach((change) => {
+              const data = change.doc.data();
+              const cardId = data.cardId;
+
+              // Un admin detecta una solicitud pendiente
+              if (
+                data.bingoCheck === "pending" &&
+                isAdmin &&
+                !pendingBingoCheck &&
+                !isGameWon
+              ) {
+                pendingBingoCheck = cardId;
+                verifyBingo(cardId);
+              }
+
+              // El jugador que solicitó el check recibe la respuesta "denied"
+              if (
+                data.bingoCheck === "denied" &&
+                localLoadedCards.has(cardId) &&
+                change.type === "modified"
+              ) {
+                winMessageText.textContent = "¡Bingo Falso! Sigue jugando.";
+                winMessage.classList.remove("bingo-win", "bg-transparent");
+                winMessage.classList.add("bg-red-200", "text-red-800");
+                winMessage.classList.remove("hidden");
+                bingoButton.disabled = false; // Permitir volver a intentarlo
+
+                // Limpiar el estado en la BD
+                const cardDocRef = doc(
+                  db,
+                  "artifacts",
+                  appId,
+                  "public",
+                  "data",
+                  "bingo_games",
+                  currentGameId,
+                  "cards",
+                  cardId
+                );
+                updateDoc(cardDocRef, { bingoCheck: null });
+              }
+            });
+          },
+          (error) => console.error("Error escuchando checks de bingo:", error)
+        );
+      }
+
       function resetLocalGame() {
         isGameWon = false;
+        pendingBingoCheck = null;
         calledNumbers.clear();
         localLoadedCards.clear();
         cardsAreaElement.innerHTML = "";
-        calledB_El.innerHTML = "";
-        calledI_El.innerHTML = "";
-        calledN_El.innerHTML = "";
-        calledG_El.innerHTML = "";
-        calledO_El.innerHTML = "";
+
+        // Limpiar tablero
+        ["B", "I", "N", "G", "O"].forEach((l) => {
+          document.getElementById(`called-${l}`).innerHTML = "";
+        });
 
         currentNumberDisplay.textContent = "-";
         winMessage.classList.add("hidden");
+        winMessage.classList.remove(
+          "bingo-win",
+          "bg-red-200",
+          "text-red-800",
+          "bg-yellow-100",
+          "text-yellow-700"
+        );
+
+        // Botones de jugador
+        bingoButton.disabled = false;
+        loadCardButton.disabled = false;
+        syncCardsButton.disabled = false;
+
         if (isAdmin) {
+          if (autoDrawInterval) stopAutoDraw();
           drawButton.disabled = false;
+          autoDrawButton.disabled = false;
           activeCardsListEl.innerHTML = "";
           activeCardsCountEl.textContent = "(0)";
           prizeInput.value = "";
           gameModeSelect.value = "full_card";
+          adminNotificationArea.classList.add("hidden");
+          adminConfirmButtons.classList.add("hidden");
         }
         prizeDisplay.textContent = "¡Mucha Suerte!";
+        gameModeDisplay.textContent = GAME_MODE_NAMES["full_card"];
       }
 
       // --- 5. Lógica de UI y Renderizado ---
 
       function updateCalledNumbersUI(drawnNumbers) {
-        calledB_El.innerHTML = "";
-        calledI_El.innerHTML = "";
-        calledN_El.innerHTML = "";
-        calledG_El.innerHTML = "";
-        calledO_El.innerHTML = "";
+        // Limpiar tableros
+        ["B", "I", "N", "G", "O"].forEach((l) => {
+          document.getElementById(`called-${l}`).innerHTML = "";
+        });
 
         if (drawnNumbers.length === 0) {
           currentNumberDisplay.textContent = "-";
@@ -1065,46 +1406,28 @@
         currentNumberDisplay.classList.add("pop");
         setTimeout(() => currentNumberDisplay.classList.remove("pop"), 200);
 
+        // Poblar el tablero BINGO (ordenado normal, el CSS lo invierte)
         const sortedNumbers = [...drawnNumbers].sort((a, b) => a - b);
-
         sortedNumbers.forEach((number) => {
           const letter = getLetterForNumber(number);
           const numberEl = document.createElement("div");
           numberEl.className = "tote-board-number";
           numberEl.textContent = number;
-          switch (letter) {
-            case "B":
-              calledB_El.appendChild(numberEl);
-              break;
-            case "I":
-              calledI_El.appendChild(numberEl);
-              break;
-            case "N":
-              calledN_El.appendChild(numberEl);
-              break;
-            case "G":
-              calledG_El.appendChild(numberEl);
-              break;
-            case "O":
-              calledO_El.appendChild(numberEl);
-              break;
-          }
+          document.getElementById(`called-${letter}`).appendChild(numberEl);
         });
       }
 
       function handleCellClick(event) {
-        if (isGameWon) return; // No marcar si ya ganó alguien
+        if (isGameWon) return;
 
         const cell = event.currentTarget;
         const number = cell.dataset.number;
 
-        if (number === "GRATIS") return; // El gratis no se toca
+        if (number === "GRATIS") return;
 
-        // Solo se puede marcar si el número HA SIDO sorteado
         if (calledNumbers.has(parseInt(number, 10))) {
           cell.classList.toggle("marked");
         } else {
-          // Opcional: feedback de que no puede marcar
           cell.classList.add("shake");
           setTimeout(() => cell.classList.remove("shake"), 300);
         }
@@ -1168,7 +1491,6 @@
             if (number === "GRATIS") {
               cell.classList.add("free", "marked");
             } else {
-              // Añadir el listener para marcado manual
               cell.addEventListener("click", handleCellClick);
             }
 
@@ -1179,77 +1501,151 @@
         cardsAreaElement.appendChild(cardWrapper);
       }
 
-      // --- LÓGICA DE VICTORIA MEJORADA ---
-      function checkWin(cardIndex, cardId) {
-        const cardContainer = document.getElementById(`card-${cardIndex}`);
-        if (!cardContainer) return false;
+      // --- LÓGICA DE VICTORIA (VALIDACIÓN DEL ADMIN) ---
 
-        const markedCells = new Set();
-        cardContainer.querySelectorAll(".bingo-cell.marked").forEach((cell) => {
-          markedCells.add(`${cell.dataset.col}-${cell.dataset.row}`);
+      // NUEVO: El admin pausa y verifica
+      async function verifyBingo(cardId) {
+        if (autoDrawInterval) stopAutoDraw();
+        drawButton.disabled = true;
+        adminNotificationArea.textContent = `Cartón #${cardId} canta ¡BINGO! Verificando...`;
+        adminNotificationArea.className =
+          "text-center p-3 rounded-lg bg-yellow-200 text-yellow-800 font-semibold";
+        adminNotificationArea.classList.remove("hidden");
+
+        // Cargar datos del cartón
+        const cardDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards",
+          cardId
+        );
+        const cardDoc = await getDoc(cardDocRef);
+        if (!cardDoc.exists()) {
+          adminNotificationArea.textContent = `Error: Cartón #${cardId} no encontrado.`;
+          handleRejectWin(); // Rechazar si no se encuentra
+          return;
+        }
+
+        const cardData = JSON.parse(cardDoc.data().cardData);
+
+        // Validación 100% segura en el lado del admin
+        const isWinner = checkWinAdmin(
+          cardData,
+          calledNumbers,
+          currentGameMode
+        );
+
+        if (isWinner) {
+          adminNotificationArea.textContent = `¡BINGO CONFIRMADO! Cartón #${cardId}. Esperando decisión...`;
+          adminNotificationArea.className =
+            "text-center p-3 rounded-lg bg-green-200 text-green-800 font-semibold";
+          adminConfirmButtons.classList.remove("hidden");
+        } else {
+          adminNotificationArea.textContent = `¡BINGO FALSO! Cartón #${cardId} no ha ganado. Continuando...`;
+          adminNotificationArea.className =
+            "text-center p-3 rounded-lg bg-red-200 text-red-800 font-semibold";
+          setTimeout(() => adminNotificationArea.classList.add("hidden"), 3000);
+          handleRejectWin(); // Rechazar si no es ganador
+        }
+      }
+
+      // NUEVO: Botón de admin para confirmar
+      async function handleConfirmWin() {
+        if (!pendingBingoCheck || !currentGameId) return;
+        const gameDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId
+        );
+        await updateDoc(gameDocRef, {
+          gameStatus: "finished",
+          winnerCardId: pendingBingoCheck,
         });
+        // El listener `listenToGameData` se encargará de parar todo
+        adminConfirmButtons.classList.add("hidden");
+        adminNotificationArea.classList.add("hidden");
+        pendingBingoCheck = null;
+      }
 
-        // Lógica de victoria basada en la modalidad de juego
-        switch (currentGameMode) {
+      // NUEVO: Botón de admin para rechazar
+      async function handleRejectWin() {
+        if (!pendingBingoCheck || !currentGameId) return;
+        const cardDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards",
+          pendingBingoCheck
+        );
+        await updateDoc(cardDocRef, { bingoCheck: "denied" });
+
+        adminNotificationArea.classList.add("hidden");
+        adminConfirmButtons.classList.add("hidden");
+
+        pendingBingoCheck = null;
+
+        // Reanudar sorteo
+        drawButton.disabled = false;
+        // No reiniciar auto-draw, dejar que el admin lo haga
+      }
+
+      // NUEVO: Lógica de checkeo 100% segura (corre en el admin)
+      function checkWinAdmin(cardData, drawnNumbers, mode) {
+        // cardData es [col][row]
+        const isMarked = (c, r) => {
+          const num = cardData[c][r];
+          return num === "GRATIS" || drawnNumbers.has(num);
+        };
+
+        switch (mode) {
           case "full_card":
-            return checkWinFullCard(markedCells);
+            for (let c = 0; c < 5; c++) {
+              for (let r = 0; r < 5; r++) {
+                if (!isMarked(c, r)) return false;
+              }
+            }
+            return true;
+
           case "h_line":
-            return checkWinHorizontalLine(markedCells);
+            for (let r = 0; r < 5; r++) {
+              if ([...Array(5).keys()].every((c) => isMarked(c, r))) {
+                return true;
+              }
+            }
+            return false;
+
           case "v_line":
-            return checkWinVerticalLine(markedCells);
+            for (let c = 0; c < 5; c++) {
+              if ([...Array(5).keys()].every((r) => isMarked(c, r))) {
+                return true;
+              }
+            }
+            return false;
+
           case "corners":
-            return checkWinCorners(markedCells);
+            return (
+              isMarked(0, 0) &&
+              isMarked(4, 0) &&
+              isMarked(0, 4) &&
+              isMarked(4, 4)
+            );
+
           default:
             return false;
         }
-      }
-
-      function checkWinFullCard(markedCells) {
-        return markedCells.size === 25;
-      }
-
-      function checkWinHorizontalLine(markedCells) {
-        for (let r = 0; r < 5; r++) {
-          if ([...Array(5).keys()].every((c) => markedCells.has(`${c}-${r}`))) {
-            return true;
-          }
-        }
-        return false;
-      }
-
-      function checkWinVerticalLine(markedCells) {
-        for (let c = 0; c < 5; c++) {
-          if ([...Array(5).keys()].every((r) => markedCells.has(`${c}-${r}`))) {
-            return true;
-          }
-        }
-        return false;
-      }
-
-      function checkWinCorners(markedCells) {
-        return (
-          markedCells.has("0-0") &&
-          markedCells.has("4-0") &&
-          markedCells.has("0-4") &&
-          markedCells.has("4-4")
-        );
-      }
-
-      function triggerWin(cardId) {
-        if (isGameWon) return;
-
-        isGameWon = true;
-        winMessageText.textContent = `¡BINGO! (Cartón #${cardId})`;
-        winMessage.classList.remove("hidden");
-
-        if (isAdmin) {
-          drawButton.disabled = true;
-        }
-        // Desactivar botones de jugador
-        bingoButton.disabled = true;
-        bingoButton.classList.add("opacity-50");
-        loadCardButton.disabled = true;
-        loadCardButton.classList.add("opacity-50");
       }
     </script>
   </body>
