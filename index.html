@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bingo Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* ... (mismos estilos de antes) ... */
+      .bingo-card-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.5rem; /* 8px */
+        max-width: 28rem; /* equivalent to max-w-md */
+        margin: auto;
+      }
+      .bingo-cell {
+        aspect-ratio: 1 / 1; /* Celdas cuadradas */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem; /* 24px */
+        font-weight: 700;
+        border-radius: 0.5rem; /* 8px */
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease-in-out;
+        user-select: none; /* Evitar seleccionar texto */
+      }
+      .bingo-cell.marked {
+        background-color: #3b82f6; /* bg-blue-500 */
+        color: white;
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+      }
+      .bingo-cell.free {
+        background-color: #f59e0b; /* bg-amber-500 */
+        color: white;
+        font-size: 1rem; /* 16px */
+        line-height: 1.2;
+      }
+      .bingo-header-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.25rem; /* 36px */
+        font-weight: 800;
+        color: #1d4ed8; /* text-blue-700 */
+      }
+      #current-number-display {
+        width: 10rem; /* 160px */
+        height: 10rem; /* 160px */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px; /* full */
+        background-color: white;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        color: #1d4ed8; /* text-blue-700 */
+        font-size: 5rem; /* 80px */
+        font-weight: 800;
+        line-height: 1;
+        transition: transform 0.2s ease;
+      }
+      #current-number-display.pop {
+        transform: scale(1.1);
+      }
+      #called-numbers-list {
+        display: grid;
+        grid-template-columns: repeat(10, minmax(0, 1fr));
+        gap: 0.5rem; /* 8px */
+      }
+      .called-number-item {
+        width: 2.5rem; /* 40px */
+        height: 2.5rem; /* 40px */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px; /* full */
+        font-weight: 600;
+        background-color: #e5e7eb; /* bg-gray-200 */
+        color: #4b5563; /* text-gray-600 */
+        font-size: 0.875rem; /* 14px */
+      }
+      #win-message {
+        animation: pulse-win 1s infinite;
+      }
+      @keyframes pulse-win {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.1);
+        }
+      }
+      #modal {
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+      /* Estilo para la lista de cartones activos */
+      #active-cards-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem; /* 8px */
+        max-height: 200px;
+        overflow-y: auto;
+        background-color: #f3f4f6; /* bg-gray-100 */
+        padding: 0.75rem; /* 12px */
+        border-radius: 0.5rem; /* 8px */
+      }
+      .active-card-tag {
+        background-color: #dbeafe; /* bg-blue-100 */
+        color: #1e40af; /* text-blue-800 */
+        font-size: 0.875rem; /* 14px */
+        font-weight: 600;
+        padding: 0.25rem 0.75rem; /* 4px 12px */
+        border-radius: 9999px; /* full */
+      }
+      /* Nuevo estilo para el tablero */
+      .tote-board-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: white;
+        color: #1d4ed8; /* text-blue-700 */
+        font-weight: 600;
+        font-size: 1rem; /* 16px */
+        border-radius: 0.375rem; /* 6px */
+        padding: 0.25rem 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 text-gray-800 p-4 md:p-8">
+    <!-- Modal para buscar cartón (oculto por defecto) -->
+    <div
+      id="modal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white w-full max-w-sm p-6 rounded-2xl shadow-xl text-center"
+      >
+        <h3 class="text-2xl font-bold mb-4">Buscar mi Cartón</h3>
+        <p class="text-gray-600 mb-4">
+          Introduce el ID de tu cartón (ej: 1, 45, etc.)
+        </p>
+        <input
+          id="card-id-input"
+          type="number"
+          class="w-full border-2 border-gray-300 rounded-lg p-3 text-center text-lg focus:border-blue-500 focus:ring-0"
+          placeholder="Ej: 5"
+        />
+        <div id="modal-error" class="text-red-500 text-sm mt-2 h-4"></div>
+        <div class="flex gap-4 mt-4">
+          <button
+            id="modal-cancel-button"
+            class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg transition-all duration-200"
+          >
+            Cancelar
+          </button>
+          <button
+            id="modal-submit-button"
+            class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200"
+          >
+            Buscar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+      <h1
+        id="main-title"
+        class="text-4xl md:text-5xl font-extrabold text-center text-blue-700 mb-4"
+      >
+        BINGO ONLINE
+      </h1>
+
+      <!-- ID del Sorteo -->
+      <div class="text-center mb-4">
+        <span class="text-lg font-semibold text-gray-700">ID del Sorteo:</span>
+        <span
+          id="game-id-display"
+          class="text-lg font-bold text-red-600 bg-white px-3 py-1 rounded-full shadow-sm"
+          >Cargando...</span
+        >
+      </div>
+
+      <!-- Botón para forzar modo Admin (solo para 'Preview') -->
+      <div id="admin-toggle-button-wrapper" class="text-center mb-4">
+        <button
+          id="admin-toggle-button"
+          class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg text-xs"
+        >
+          Activar Modo Admin (Solo para Pruebas)
+        </button>
+      </div>
+
+      <!-- Mensaje de BINGO (oculto por defecto) -->
+      <div id="win-message" class="hidden text-center mb-6">
+        <span
+          id="win-message-text"
+          class="text-6xl md:text-7xl font-extrabold text-amber-500"
+          >¡B I N G O!</span
+        >
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Columna Izquierda: Sorteo y Números Sorteados -->
+        <div
+          class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg flex flex-col items-center gap-6 order-2 lg:order-1"
+        >
+          <!-- Número Sorteado Actual -->
+          <div class="text-center">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">
+              Número Sorteado
+            </h2>
+            <div id="current-number-display" class="mx-auto">-</div>
+          </div>
+
+          <!-- Panel de Administrador (oculto por defecto) -->
+          <div id="admin-panel" class="hidden w-full space-y-4">
+            <div class="flex flex-col sm:flex-row gap-4 w-full">
+              <button
+                id="draw-button"
+                class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
+              >
+                Sortear Número
+              </button>
+              <button
+                id="reset-button"
+                class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
+              >
+                Nuevo Juego
+              </button>
+            </div>
+
+            <!-- NUEVA SECCIÓN: Cartones Activos -->
+            <div class="space-y-2">
+              <h3 class="text-xl font-bold text-center text-gray-700">
+                Cartones Activos
+                <span
+                  id="active-cards-count"
+                  class="text-lg font-semibold text-blue-600"
+                  >(0)</span
+                >
+              </h3>
+              <div
+                id="active-cards-list"
+                class="border rounded-lg p-3 bg-gray-50 h-32 overflow-y-auto"
+              >
+                <!-- Los cartones activos se listarán aquí -->
+              </div>
+            </div>
+
+            <p class="text-xs text-center text-gray-500">
+              Estás en modo Administrador.
+            </p>
+          </div>
+
+          <!-- Tablero de Números Sorteados (Tote Board) -->
+          <div class="w-full">
+            <h3 class="text-xl font-bold text-center text-gray-700 mb-4">
+              Tablero de Sorteo
+            </h3>
+            <div
+              class="grid grid-cols-5 gap-2 text-center bg-gray-100 p-2 rounded-lg"
+            >
+              <!-- Encabezados -->
+              <div class="text-2xl font-extrabold text-blue-700">B</div>
+              <div class="text-2xl font-extrabold text-blue-700">I</div>
+              <div class="text-2xl font-extrabold text-blue-700">N</div>
+              <div class="text-2xl font-extrabold text-blue-700">G</div>
+              <div class="text-2xl font-extrabold text-blue-700">O</div>
+
+              <!-- Contenedores de Números -->
+              <div
+                id="called-B"
+                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md bg-white"
+              ></div>
+              <div
+                id="called-I"
+                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md bg-white"
+              ></div>
+              <div
+                id="called-N"
+                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md bg-white"
+              ></div>
+              <div
+                id="called-G"
+                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md bg-white"
+              ></div>
+              <div
+                id="called-O"
+                class="space-y-1 h-40 overflow-y-auto p-1 border border-gray-200 rounded-md bg-white"
+              ></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Cartones de Bingo -->
+        <div
+          class="lg:col-span-2 bg-blue-100 p-6 rounded-2xl shadow-lg order-1 lg:order-2"
+        >
+          <div class="max-w-md mx-auto">
+            <!-- Panel de Jugador -->
+            <div id="player-panel" class="mb-4 text-center">
+              <button
+                id="load-card-button"
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all duration-200 text-lg"
+              >
+                Buscar mi Cartón
+              </button>
+            </div>
+
+            <!-- Encabezado BINGO -->
+            <div class="grid grid-cols-5 gap-2 mb-2">
+              <div class="bingo-header-cell">B</div>
+              <div class="bingo-header-cell">I</div>
+              <div class="bingo-header-cell">N</div>
+              <div class="bingo-header-cell">G</div>
+              <div class="bingo-header-cell">O</div>
+            </div>
+
+            <!-- Área de Cartones de Bingo -->
+            <div id="cards-area" class="space-y-6">
+              <!-- Los cartones de bingo se generarán aquí con JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+      // Importa las funciones que necesitas
+      import {
+        initializeApp,
+        setLogLevel,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+      import {
+        getAuth,
+        signInAnonymously,
+        signInWithCustomToken,
+        onAuthStateChanged,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      import {
+        getFirestore,
+        doc,
+        getDoc,
+        setDoc,
+        updateDoc,
+        onSnapshot,
+        collection,
+        writeBatch,
+        serverTimestamp,
+      } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+      // Pega aquí la configuración de TU proyecto de Firebase
+      // O usa la variable __firebase_config para probar en el 'Preview'
+      const firebaseConfig = {
+        apiKey: "AIzaSyAsfyZK5Gv7XkJYfh0GlJHRfMFBWzNQjmM",
+        authDomain: "bingoclaravirginia.firebaseapp.com",
+        projectId: "bingoclaravirginia",
+        storageBucket: "bingoclaravirginia.firebasestorage.app",
+        messagingSenderId: "290520708699",
+        appId: "1:290520708699:web:a37d42aad57ea63228717e",
+        measurementId: "G-YB1SG1JH6H",
+      };
+      const appId = typeof __app_id !== "undefined" ? __app_id : "bingo-online";
+
+      // Inicializa Firebase
+      let app, auth, db;
+      let userId = null;
+      let isAdmin = false;
+
+      // Estado del juego
+      let currentGameId = null;
+      let localLoadedCards = new Map(); // Almacena los datos de los cartones cargados
+      let calledNumbers = new Set();
+      let isGameWon = false;
+      let unsubscribeGame = null; // Función para dejar de escuchar el juego actual
+      let unsubscribeCards = null; // Función para dejar de escuchar los cartones
+
+      // Elementos del DOM
+      const adminPanel = document.getElementById("admin-panel");
+      const playerPanel = document.getElementById("player-panel");
+      const drawButton = document.getElementById("draw-button");
+      const resetButton = document.getElementById("reset-button");
+      const loadCardButton = document.getElementById("load-card-button");
+
+      const gameIdDisplay = document.getElementById("game-id-display");
+      const currentNumberDisplay = document.getElementById(
+        "current-number-display"
+      );
+      const calledNumbersList = document.getElementById("called-numbers-list");
+      const cardsAreaElement = document.getElementById("cards-area");
+
+      const winMessage = document.getElementById("win-message");
+      const winMessageText = document.getElementById("win-message-text");
+
+      const modal = document.getElementById("modal");
+      const modalError = document.getElementById("modal-error");
+      const cardIdInput = document.getElementById("card-id-input");
+      const modalCancelButton = document.getElementById("modal-cancel-button");
+      const modalSubmitButton = document.getElementById("modal-submit-button");
+
+      const activeCardsListEl = document.getElementById("active-cards-list");
+      const activeCardsCountEl = document.getElementById("active-cards-count");
+
+      // Nuevos elementos del Tablero
+      const calledB_El = document.getElementById("called-B");
+      const calledI_El = document.getElementById("called-I");
+      const calledN_El = document.getElementById("called-N");
+      const calledG_El = document.getElementById("called-G");
+      const calledO_El = document.getElementById("called-O");
+
+      // Rangos de Números
+      const BINGO_RANGES = {
+        0: { min: 1, max: 15 }, // B
+        1: { min: 16, max: 30 }, // I
+        2: { min: 31, max: 45 }, // N
+        3: { min: 46, max: 60 }, // G
+        4: { min: 61, max: 75 }, // O
+      };
+
+      // --- 1. Inicialización y Autenticación ---
+      document.addEventListener("DOMContentLoaded", () => {
+        try {
+          app = initializeApp(firebaseConfig);
+          db = getFirestore(app);
+          auth = getAuth(app);
+          setLogLevel("Debug"); // Para ver logs detallados en la consola
+          checkAuth();
+        } catch (e) {
+          console.error("Error al inicializar Firebase:", e);
+          gameIdDisplay.textContent = "Error de conexión";
+        }
+
+        // Listeners de botones
+        resetButton.addEventListener("click", handleNewGame);
+        drawButton.addEventListener("click", handleDrawNumber);
+        loadCardButton.addEventListener("click", promptLoadCard);
+        modalCancelButton.addEventListener("click", () =>
+          modal.classList.add("hidden")
+        );
+        modalSubmitButton.addEventListener("click", handleLoadCard);
+
+        // Botón para activar el modo admin en el 'Preview'
+        document
+          .getElementById("admin-toggle-button")
+          .addEventListener("click", setupAdminToggleForTest);
+      });
+
+      async function checkAuth() {
+        try {
+          const authToken =
+            typeof __initial_auth_token !== "undefined"
+              ? __initial_auth_token
+              : null;
+          if (authToken) {
+            await signInWithCustomToken(auth, authToken);
+          } else {
+            await signInAnonymously(auth);
+          }
+        } catch (error) {
+          console.error("Error de autenticación:", error);
+        }
+
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            userId = user.uid;
+            setupAppMode(); // Configura el modo (admin/player)
+            listenToCurrentGame(); // Empieza a escuchar el juego activo
+          } else {
+            console.log("Usuario no autenticado.");
+          }
+        });
+      }
+
+      function setupAppMode() {
+        const urlParams = new URLSearchParams(window.location.search);
+        // El ?admin=true funcionará en producción.
+        // El botón de 'toggle' es para el 'Preview'.
+        isAdmin = urlParams.get("admin") === "true";
+
+        if (isAdmin) {
+          showAdminPanel();
+        } else {
+          adminPanel.classList.add("hidden");
+          playerPanel.classList.remove("hidden");
+        }
+      }
+
+      function setupAdminToggleForTest() {
+        console.log("¡MODO ADMIN FORZADO PARA PRUEBAS!");
+        isAdmin = true;
+        showAdminPanel();
+        document
+          .getElementById("admin-toggle-button-wrapper")
+          .classList.add("hidden");
+        // Si el listener del juego ya se ejecutó, necesitamos iniciar el listener de cartones
+        if (currentGameId) {
+          listenToActiveCards();
+        }
+      }
+
+      function showAdminPanel() {
+        adminPanel.classList.remove("hidden");
+        playerPanel.classList.add("hidden");
+      }
+
+      // --- 2. Lógica del Sorteo (Admin) ---
+
+      async function handleNewGame() {
+        console.log("Iniciando nuevo juego...");
+
+        const newGameId = `SORTEO-${
+          new Date().toISOString().split("T")[0]
+        }-${Math.random().toString(36).substr(2, 5)}`;
+        console.log(`Creando nuevo juego con ID: ${newGameId}`);
+
+        const batch = writeBatch(db);
+        const cardsCollectionRef = collection(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          newGameId,
+          "cards"
+        );
+
+        for (let i = 1; i <= 100; i++) {
+          const cardData = generateCardData();
+          const cardDataJSON = JSON.stringify(cardData);
+          const cardDocRef = doc(cardsCollectionRef, i.toString());
+          // Añadimos 'status' para rastrear los cartones activos
+          batch.set(cardDocRef, {
+            cardData: cardDataJSON,
+            cardId: i.toString(),
+            status: "inactive", // 'inactive', 'active'
+          });
+        }
+
+        const gameDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          newGameId
+        );
+        batch.set(gameDocRef, {
+          drawnNumbers: [],
+          allNumbers: Array.from({ length: 75 }, (_, i) => i + 1),
+        });
+
+        const configDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_config",
+          "current_game"
+        );
+        batch.set(configDocRef, { gameId: newGameId });
+
+        try {
+          await batch.commit();
+          console.log("¡Nuevo juego creado exitosamente!");
+        } catch (e) {
+          console.error("Error al crear nuevo juego:", e);
+        }
+      }
+
+      async function handleDrawNumber() {
+        // ... (sin cambios en esta función) ...
+        if (!currentGameId || isGameWon) return;
+
+        drawButton.disabled = true;
+        const gameDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId
+        );
+
+        try {
+          const gameDoc = await getDoc(gameDocRef);
+          if (!gameDoc.exists()) {
+            console.error("El documento del juego no existe.");
+            drawButton.disabled = false;
+            return;
+          }
+
+          let { drawnNumbers, allNumbers } = gameDoc.data();
+          const availableNumbers = allNumbers.filter(
+            (n) => !drawnNumbers.includes(n)
+          );
+
+          if (availableNumbers.length === 0) {
+            console.log("No hay más números para sortear.");
+            return;
+          }
+
+          const randIndex = Math.floor(Math.random() * availableNumbers.length);
+          const newNumber = availableNumbers[randIndex];
+
+          const newDrawnNumbers = [...drawnNumbers, newNumber];
+          await updateDoc(gameDocRef, { drawnNumbers: newDrawnNumbers });
+
+          setTimeout(() => {
+            if (!isGameWon) drawButton.disabled = false;
+          }, 500);
+        } catch (e) {
+          console.error("Error al sortear número:", e);
+          drawButton.disabled = false;
+        }
+      }
+
+      // --- 3. Lógica del Jugador ---
+
+      function promptLoadCard() {
+        cardIdInput.value = "";
+        modalError.textContent = "";
+        modal.classList.remove("hidden");
+        cardIdInput.focus();
+      }
+
+      async function handleLoadCard() {
+        const cardId = cardIdInput.value.trim();
+        if (!cardId || !currentGameId) {
+          modalError.textContent = "ID de cartón inválido.";
+          return;
+        }
+
+        if (localLoadedCards.has(cardId)) {
+          modalError.textContent = "Ese cartón ya está cargado.";
+          setTimeout(() => modal.classList.add("hidden"), 1000);
+          return;
+        }
+
+        const cardDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards",
+          cardId
+        );
+
+        try {
+          const cardDoc = await getDoc(cardDocRef);
+          if (cardDoc.exists()) {
+            const cardData = JSON.parse(cardDoc.data().cardData);
+            const cardIndex = localLoadedCards.size;
+
+            localLoadedCards.set(cardId, { data: cardData, index: cardIndex });
+            renderCard(cardData, cardIndex, cardId);
+            autoMarkAllCards();
+
+            // ¡NUEVO! Reportar este cartón como activo
+            try {
+              await updateDoc(cardDocRef, {
+                status: "active",
+                lastLoadedAt: serverTimestamp(),
+              });
+              console.log(`Cartón ${cardId} marcado como activo.`);
+            } catch (updateError) {
+              console.warn(
+                "No se pudo marcar el cartón como activo:",
+                updateError
+              );
+            }
+
+            modal.classList.add("hidden");
+          } else {
+            modalError.textContent = "Cartón no encontrado en este sorteo.";
+          }
+        } catch (e) {
+          console.error("Error al cargar cartón:", e);
+          modalError.textContent = "Error al conectar con la base de datos.";
+        }
+      }
+
+      // --- 4. Lógica Sincronizada (Todos) ---
+
+      function listenToCurrentGame() {
+        const configDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_config",
+          "current_game"
+        );
+
+        onSnapshot(
+          configDocRef,
+          (doc) => {
+            if (doc.exists()) {
+              const newGameId = doc.data().gameId;
+
+              if (newGameId !== currentGameId) {
+                console.log(`Transicionando al juego: ${newGameId}`);
+                currentGameId = newGameId;
+                gameIdDisplay.textContent = currentGameId;
+
+                if (unsubscribeGame) unsubscribeGame();
+                if (unsubscribeCards) unsubscribeCards(); // Detener listener de cartones anterior
+
+                resetLocalGame();
+
+                listenToDrawnNumbers();
+                if (isAdmin) {
+                  listenToActiveCards(); // Si es admin, empezar a escuchar cartones
+                }
+              }
+            } else {
+              gameIdDisplay.textContent = "No hay juego activo";
+            }
+          },
+          (error) => {
+            console.error("Error escuchando el juego actual:", error);
+            gameIdDisplay.textContent = "Error de conexión";
+          }
+        );
+      }
+
+      function listenToDrawnNumbers() {
+        // ... (sin cambios en esta función) ...
+        if (!currentGameId) return;
+
+        const gameDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId
+        );
+
+        unsubscribeGame = onSnapshot(
+          gameDocRef,
+          (doc) => {
+            if (doc.exists()) {
+              const { drawnNumbers } = doc.data();
+              calledNumbers = new Set(drawnNumbers);
+
+              updateCalledNumbersUI(drawnNumbers);
+              autoMarkAllCards();
+
+              if (drawnNumbers.length === 75) {
+                isGameWon = true; // El juego termina
+                drawButton.disabled = true;
+              }
+            }
+          },
+          (error) => {
+            console.error("Error escuchando números sorteados:", error);
+          }
+        );
+      }
+
+      // --- ¡NUEVA FUNCIÓN! ---
+      // Solo la llama el Administrador
+      function listenToActiveCards() {
+        if (!currentGameId || !isAdmin) return;
+
+        const cardsCollectionRef = collection(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "bingo_games",
+          currentGameId,
+          "cards"
+        );
+
+        // Traemos todos los cartones y filtramos los activos en el cliente.
+        // Esto evita tener que crear un índice en Firestore.
+        unsubscribeCards = onSnapshot(
+          cardsCollectionRef,
+          (querySnapshot) => {
+            activeCardsListEl.innerHTML = ""; // Limpiar lista
+            let cardIds = [];
+
+            querySnapshot.forEach((doc) => {
+              if (doc.data().status === "active") {
+                // Filtro en el cliente
+                cardIds.push(doc.data().cardId);
+              }
+            });
+
+            // Ordenar los IDs numéricamente para que se vea bien
+            cardIds.sort((a, b) => parseInt(a) - parseInt(b));
+
+            // Renderizar la lista
+            cardIds.forEach((cardId) => {
+              const cardTag = document.createElement("span");
+              cardTag.className = "active-card-tag";
+              cardTag.textContent = cardId;
+              activeCardsListEl.appendChild(cardTag);
+            });
+
+            activeCardsCountEl.textContent = `(${cardIds.length})`;
+          },
+          (error) => {
+            console.error("Error escuchando cartones activos:", error);
+          }
+        );
+      }
+
+      function resetLocalGame() {
+        isGameWon = false;
+        calledNumbers.clear();
+        localLoadedCards.clear();
+        cardsAreaElement.innerHTML = "";
+        // Limpiar el nuevo tablero
+        calledB_El.innerHTML = "";
+        calledI_El.innerHTML = "";
+        calledN_El.innerHTML = "";
+        calledG_El.innerHTML = "";
+        calledO_El.innerHTML = "";
+
+        currentNumberDisplay.textContent = "-";
+        winMessage.classList.add("hidden");
+        if (isAdmin) {
+          drawButton.disabled = false;
+          // Limpiar la lista de cartones activos
+          activeCardsListEl.innerHTML = "";
+          activeCardsCountEl.textContent = "(0)";
+        }
+      }
+
+      // --- 5. Lógica de UI y Renderizado ---
+
+      function updateCalledNumbersUI(drawnNumbers) {
+        // Limpiar tableros
+        calledB_El.innerHTML = "";
+        calledI_El.innerHTML = "";
+        calledN_El.innerHTML = "";
+        calledG_El.innerHTML = "";
+        calledO_El.innerHTML = "";
+
+        if (drawnNumbers.length === 0) {
+          currentNumberDisplay.textContent = "-";
+          return;
+        }
+
+        // Mostrar último número
+        const lastNumber = drawnNumbers[drawnNumbers.length - 1];
+        currentNumberDisplay.textContent = lastNumber;
+        currentNumberDisplay.classList.add("pop");
+        setTimeout(() => currentNumberDisplay.classList.remove("pop"), 200);
+
+        // Ordenar números para el tablero
+        const sortedNumbers = [...drawnNumbers].sort((a, b) => a - b);
+
+        // Poblar el tablero BINGO
+        sortedNumbers.forEach((number) => {
+          const letter = getLetterForNumber(number);
+          const numberEl = document.createElement("div");
+          numberEl.className = "tote-board-number";
+          numberEl.textContent = number;
+
+          switch (letter) {
+            case "B":
+              calledB_El.appendChild(numberEl);
+              break;
+            case "I":
+              calledI_El.appendChild(numberEl);
+              break;
+            case "N":
+              calledN_El.appendChild(numberEl);
+              break;
+            case "G":
+              calledG_El.appendChild(numberEl);
+              break;
+            case "O":
+              calledO_El.appendChild(numberEl);
+              break;
+          }
+        });
+      }
+
+      function autoMarkAllCards() {
+        // ... (sin cambios en esta función) ...
+        if (isGameWon) return;
+
+        calledNumbers.forEach((number) => {
+          const cellsToMark = document.querySelectorAll(
+            `.bingo-cell[data-number="${number}"]`
+          );
+          cellsToMark.forEach((cell) => cell.classList.add("marked"));
+        });
+
+        localLoadedCards.forEach((card, cardId) => {
+          checkWin(card.index, cardId);
+        });
+      }
+
+      // --- 6. Lógica del Juego (Generar, Renderizar, Ganar) ---
+
+      // Nueva función de utilidad
+      function getLetterForNumber(number) {
+        if (number <= 15) return "B";
+        if (number <= 30) return "I";
+        if (number <= 45) return "N";
+        if (number <= 60) return "G";
+        if (number <= 75) return "O";
+        return "";
+      }
+
+      function generateCardData() {
+        // ... (sin cambios en esta función) ...
+        let card = []; // 5 columnas
+        for (let c = 0; c < 5; c++) {
+          let colNumbers = new Set();
+          const { min, max } = BINGO_RANGES[c];
+          const count = c === 2 ? 4 : 5;
+
+          while (colNumbers.size < count) {
+            const num = Math.floor(Math.random() * (max - min + 1)) + min;
+            colNumbers.add(num);
+          }
+
+          let colArray = Array.from(colNumbers);
+          if (c === 2) {
+            colArray.splice(2, 0, "GRATIS");
+          }
+          card.push(colArray);
+        }
+        return card;
+      }
+
+      function renderCard(cardData, cardIndex, cardId) {
+        // ... (sin cambios en esta función) ...
+        const cardWrapper = document.createElement("div");
+        cardWrapper.id = `card-${cardIndex}`;
+        cardWrapper.dataset.cardId = cardId;
+        cardWrapper.className = "bg-white p-4 rounded-lg shadow-inner";
+
+        const title = document.createElement("h3");
+        title.className = "text-xl font-bold text-center text-blue-600 mb-3";
+        title.textContent = `Cartón #${cardId}`;
+        cardWrapper.appendChild(title);
+
+        const grid = document.createElement("div");
+        grid.className = "bingo-card-grid";
+
+        for (let r = 0; r < 5; r++) {
+          for (let c = 0; c < 5; c++) {
+            const number = cardData[c][r];
+            const cell = document.createElement("div");
+            cell.classList.add("bingo-cell");
+            cell.textContent = number;
+
+            cell.dataset.col = c;
+            cell.dataset.row = r;
+            cell.dataset.number = number;
+            cell.dataset.cardIndex = cardIndex;
+
+            if (number === "GRATIS") {
+              cell.classList.add("free", "marked");
+            }
+
+            grid.appendChild(cell);
+          }
+        }
+
+        cardWrapper.appendChild(grid);
+        cardsAreaElement.appendChild(cardWrapper);
+      }
+
+      function checkWin(cardIndex, cardId) {
+        // ... (sin cambios en esta función) ...
+        if (isGameWon && !isAdmin) return;
+
+        const cardContainer = document.getElementById(`card-${cardIndex}`);
+        if (!cardContainer) return;
+
+        const markedCells = new Set();
+        cardContainer.querySelectorAll(".bingo-cell.marked").forEach((cell) => {
+          markedCells.add(`${cell.dataset.col}-${cell.dataset.row}`);
+        });
+
+        let winningLine = false;
+
+        for (let r = 0; r < 5; r++) {
+          if ([...Array(5).keys()].every((c) => markedCells.has(`${c}-${r}`))) {
+            winningLine = true;
+            break;
+          }
+        }
+        if (!winningLine) {
+          for (let c = 0; c < 5; c++) {
+            if (
+              [...Array(5).keys()].every((r) => markedCells.has(`${c}-${r}`))
+            ) {
+              winningLine = true;
+              break;
+            }
+          }
+        }
+        if (!winningLine) {
+          if ([...Array(5).keys()].every((i) => markedCells.has(`${i}-${i}`))) {
+            winningLine = true;
+          }
+        }
+        if (!winningLine) {
+          if (
+            [...Array(5).keys()].every((i) => markedCells.has(`${4 - i}-${i}`))
+          ) {
+            winningLine = true;
+          }
+        }
+
+        if (winningLine) {
+          triggerWin(cardId);
+        }
+      }
+
+      function triggerWin(cardId) {
+        // ... (sin cambios en esta función) ...
+        if (isGameWon) return;
+
+        isGameWon = true;
+        winMessageText.textContent = `¡BINGO! (Cartón #${cardId})`;
+        winMessage.classList.remove("hidden");
+
+        if (isAdmin) {
+          drawButton.disabled = true;
+        }
+      }
+    </script>
+  </body>
+</html>
